@@ -1,0 +1,156 @@
+body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
+  background:#DFE9ED;
+}
+.header{
+  padding:10px 16px;
+  background:#0099A1;
+  border-bottom:1px solid #0099A1;
+  font-weight:600;
+}
+.wrapper{
+  padding:12px;
+  height:100vh;
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+}
+revo-grid{
+  --rgHeaderBackground:#DFE9ED;
+  --rgHeaderFontColor:#222;
+  --rgBorderColor:#d7e3ff;
+  --rgRowStripeBackground:#f9fbff;
+  --rgRowSelectedBackground:#e2eeff;
+  height:100%;
+  border:1px solid var(--rgBorderColor);
+  background:white;
+}
+
+/* 调整年份带的样式 */
+.year-band {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  background: white;
+  /* 移除 padding-left，改为 margin 或者让它从周列开始 */
+  margin-left: 310px; /* 让它从周列起点开始 */
+  border: 1px solid #0099A1;
+  border-bottom: none;
+}
+
+.year-span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  background: white;
+}
+
+
+
+/* Info 列：左侧合并信息，橙色背景接近截图 */
+.cell-info{
+  white-space:pre-line;
+  padding:4px 6px;
+  background:#96BE0D;
+  border-right:1px solid #96BE0D;
+  border-top:none;
+  border-bottom:none;
+}
+/* Info 列：根行与子行共享同一块背景，看起来像合并单元格 */
+.cell-info-root{
+  font-weight:600;
+}
+.cell-info-child{
+  /* 子行只要延续相同底色即可，不显示文本 */
+  color:transparent;
+}
+
+/* Name 列：树形文字 */
+.cell-name{
+  padding-top:4px;
+  padding-bottom:4px;
+}
+
+/* Capacity 列 */
+.cell-capacity{
+  font-weight:600;
+}
+
+/* 周数据单元格：有值时淡蓝色背景，>=80 时红色 */
+.cell-has{
+  background:#e8f2ff;
+  font-weight:600;
+}
+.cell-gt80{
+  background:#D200D2;
+  color:#D200D2;
+  font-weight:600;
+}
+
+
+/* v6_final_fix2: remove default padding so background fills entire cell */
+revo-grid rg-cell, 
+revo-grid .rgCell, 
+revo-grid .rgRowCell {
+  padding: 0 !important;
+}
+
+/* allow header text to render newline characters */
+revo-grid rg-header-cell,
+revo-grid .rgHeaderCell {
+  white-space: pre-line !important;
+}
+
+
+/* v6_final_fix3: ensure outer cells transparent so inner div background fills all */
+revo-grid rg-cell,
+revo-grid .rgCell,
+revo-grid .rgRowCell {
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+/* Try to avoid ellipsis and allow full header text */
+revo-grid rg-header-cell,
+revo-grid .rgHeaderCell {
+  text-overflow: clip !important;
+  overflow: visible !important;
+}
+
+
+.grid-container{
+  flex:1;
+  min-height:0;
+}
+
+.grid-container revo-grid{
+  height:100%;
+}
+
+/* 给 Info / Name / Capacity 前三列统一加边框 */
+revo-grid .cell-name,
+revo-grid .cell-capacity {
+  border: 1px solid #d0d7e2 !important;
+  box-sizing: border-box;
+}
+.app-container {
+  padding: 10px;
+  background: #f8f9fa;
+  border: 5px solid #cccccc; /* 添加边框 */
+  border-bottom: 2px solid #cccccc; /* 如果需要额外的底部分割线也可以保留 */
+  border-radius: 4px; /* 如果你希望有轻微圆角也可以加上 */
+}
+
+
+/* 保持底部导航栏背景色，让它更明显 */
+.bottom-nav {
+  background: #007bff; /* 例如深蓝色底 */
+  color: white;
+}
+
+.bottom-item.active {
+  background: #0056b3; /* 激活状态更深的颜色 */
+}

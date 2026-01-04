@@ -1,0 +1,106 @@
+/* 整体布局 */
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #ffffff;
+}
+
+/* ======================== */
+/* 顶部 Tab（无圆角） */
+/* ======================== */
+.top-tabs {
+  display: flex;
+  background: #0099A133; /* 子界面的紫灰色风格 */
+  padding: 6px 10px;
+  border-bottom: 2px solid #0099A155;
+}
+
+.tab-item {
+  width: 120px;     /* ★ 两个 Tab 同样宽度 */
+  text-align: center;
+  padding: 6px 0;   /* 垂直居中，不要横向 padding */
+  margin-right: 8px;
+  background: #0099A155;
+  border: 1px solid #0099A155;
+  cursor: pointer;
+  border-radius: 0;
+  font-weight: bold;
+}
+
+.tab-item.active {
+  background: #0099A1;
+  border-color: #0099A1;
+}
+
+/* ======================== */
+/* 第二行下拉（橙色，无圆角） */
+/* ======================== */
+.filter-row {
+  display: flex;
+  gap: 8px;
+  padding: 11px;
+  background: #96BE0D33; /* 子界面浅黄 */
+  border-bottom: 1px solid #96BE0D55;
+}
+
+.filter-select {
+  width: 150px;          /* ★ 6 个下拉框统一宽度 */
+  height: 28px;
+  background: #96BE0D;
+  color: black;
+  border: 1px solid #96BE0D;
+  border-radius: 0;
+  font-weight: bold;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+/* ======================== */
+/* 内容区 */
+/* ======================== */
+.content-area {
+  flex: 1;
+  overflow: auto;
+  background: #f4f9ff;
+}
+
+.placeholder {
+  padding: 40px;
+  text-align: center;
+  color: #666;
+}
+
+/* ======================== */
+/* 底部导航（三等分 + 清晰分隔） */
+/* ======================== */
+.bottom-nav {
+  display: flex;
+  width: 100%;
+  border-top: 2px solid #c2d3e8;
+  background: #e7efff;
+}
+
+.bottom-item {
+  flex: 1;
+  padding: 12px 0;
+  text-align: center;
+  background: #0099A1;
+  border-right: 2px solid #c2d3e8;
+  cursor: pointer;
+  font-weight: bold;
+  border-radius: 0; /* 去圆角 */
+}
+
+.bottom-item:last-child {
+  border-right: none;
+}
+
+.bottom-item:hover {
+  background: #96BE0D;
+}
+
+.bottom-item.active {
+  background: #96BE0D; /* 激活时更深 */
+  color: #ffffff;
+}

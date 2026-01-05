@@ -24,6 +24,7 @@
     ]
   },
   "include": [
-    "src"
+    "src",
+    "src/typings/revogrid.d.ts"
   ]
 }

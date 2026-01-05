@@ -1,7 +1,7 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { RevoGrid } from '@revolist/react-datagrid';
 import YearBand from './YearBand';
-import { weekLabels, yearSpans, data as initialData, type RowNode } from './data';
+import { weekLabels, yearSpans, data as projectData, type RowNode } from './data';
 import './styles.css';
 
 const COL_W = 90;
@@ -10,10 +10,12 @@ const COL_W = 90;
 const WEEK_PROPS = weekLabels.map((_, i) => 'w' + (i + 1));
 
 const LEVEL_STYLES = [
-  { bg: '#96BE0D33', color: '#5a4b2c' }, // level 0: Project
-  { bg: '#0099A111', color: '#3e4a6b' }, // level 1: Team
-  { bg: '#ffffff', color: '#000000' }, // level 2: Engineer
+  { bg: '#96BE0D33', color: '#5a4b2c' }, // level 0: Project / Person
+  { bg: '#0099A111', color: '#3e4a6b' }, // level 1: Section (Capacity / Projects)
+  { bg: '#ffffff', color: '#000000' },   // level 2+: Detail rows
 ];
+
+type TabKey = 'planProjects' | 'planTeams' | 'review';
 
 function getLevelStyle(level: number) {
   const idx = level >= 0 && level < LEVEL_STYLES.length ? level : 2;
@@ -77,78 +79,146 @@ function flattenRows(rows: RowNode[]): RowNode[] {
   return flat;
 }
 
-const AnyRevoGrid: any = RevoGrid;
+// PlanTeams 视图用的示例“人员视角”数据（参考截图）
+const initialTeamData: RowNode[] = [
+  {
+    name: 'XXX',
+    skill: '3D',
+    children: [
+      {
+        name: 'Capacity',
+        children: [
+          {
+            name: 'Absences',
+            w2: 80,
+            w3: 20,
+          },
+          {
+            name: 'Projects',
+            children: [
+              {
+                name: 'SPA',
+                skill: '3D',
+                w4: 50,
+                w5: 40,
+                w6: 10,
+              },
+              {
+                name: 'FP0.8',
+                skill: '3D',
+                w5: 70,
+                w6: 30,
+                w7: 40,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'ZZZ',
+    skill: 'Software,Camera',
+    children: [
+      {
+        name: 'Capacity',
+        children: [
+          {
+            name: 'Absences',
+            w7: 8,
+          },
+          {
+            name: 'Projects',
+            children: [
+              {
+                name: 'ZEEKR',
+                skill: 'Software',
+                w8: 40,
+                w9: 32,
+              },
+              {
+                name: 'FP0.8',
+                skill: 'Camera',
+                w9: 10,
+                w10: 10,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+];
 
 export default function App() {
   const spans = yearSpans(weekLabels);
+  const [activeTab, setActiveTab] = useState<TabKey>('planProjects');
 
-  const [rows, setRows] = useState<RowNode[]>(() => {
-    const cloned = cloneRows(initialData);
+  // PlanProjects（项目视角）数据
+  const [projectRows, setProjectRows] = useState<RowNode[]>(() => {
+    const cloned = cloneRows(projectData);
     recalcCapacities(cloned);
     return cloned;
   });
 
-  const gridRef = useRef<any>(null);
+  // PlanTeams（人员视角）数据
+  const [teamRows, setTeamRows] = useState<RowNode[]>(() => {
+    const cloned = cloneRows(initialTeamData);
+    recalcCapacities(cloned);
+    return cloned;
+  });
+
+  const projectGridRef = useRef<any>(null);
+  const teamGridRef = useRef<any>(null);
 
   // 拍平后的行（包含 _level / _info），用于绑定到 RevoGrid
-  const flatRows = useMemo(() => flattenRows(rows), [rows]);
+  const flatProjectRows = useMemo(() => flattenRows(projectRows), [projectRows]);
+  const flatTeamRows = useMemo(() => flattenRows(teamRows), [teamRows]);
 
-  // 监听 RevoGrid 的 afteredit 事件（v4 系列事件名为 afteredit）
-  const handleAfterEdit = (e: any) => {
-    // RevoGrid 事件在不同版本上 detail 结构不完全一样，这里都兜一下
-    const detail = e.detail || e || {};
-    const rowIndex: number | undefined =
-      detail.row ?? detail.rowIndex ?? detail.rowIdx;
+  // 通用编辑处理函数工厂（项目视角 & 人员视角共用）
+  const createEditHandler = (setTree: any) => {
+    return (e: any) => {
+      const detail = e.detail || e || {};
+      const rowIndex: number | undefined =
+        detail.row ?? detail.rowIndex ?? detail.rowIdx;
 
-    // prop 可能在 detail.prop，也可能在 detail.column.prop / name 上
-    let prop: string | undefined =
-      detail.prop ??
-      detail.column?.prop ??
-      detail.column?.name;
+      let prop: string | undefined =
+        detail.prop ??
+        detail.column?.prop ??
+        detail.column?.name;
 
-    const val: any = detail.val ?? detail.model?.[prop as string];
+      const val: any = detail.val ?? detail.model?.[prop as string];
 
-    // 看看事件到底长什么样，方便你调试
-    console.log('afteredit detail = ', detail);
+      if (typeof rowIndex !== 'number') return;
+      if (typeof prop !== 'string') return;
 
-    if (typeof rowIndex !== 'number') {
-      return;
-    }
-    if (typeof prop !== 'string') {
-      return;
-    }
+      // 只处理周列：w1..w52
+      if (!prop.startsWith('w')) return;
 
-    // 只处理周列：w1..w52
-    if (!prop.startsWith('w')) {
-      return;
-    }
+      setTree((prev: RowNode[]) => {
+        const cloned = cloneRows(prev);
+        const flat = flattenRows(cloned);
+        const target = flat[rowIndex];
+        if (!target) return prev;
 
-    setRows(prev => {
-      // 深拷贝整棵树
-      const cloned = cloneRows(prev);
+        // 只允许明细行编辑（level >= 2）
+        const level = (target as any)._level ?? 0;
+        if (level < 2) {
+          alert('请在明细行输入工时（例如具体工程师或项目行）。');
+          return prev;
+        }
 
-      // 拍平成一维数组，对齐 rowIndex
-      const flat = flattenRows(cloned);
-      const target = flat[rowIndex];
-      if (!target) return prev;
-
-      // 只允许工程师行编辑
-      if ((target as any)._level !== 2) {
-        alert('Team / Project 行不可编辑，请在工程师行输入工时。');
-        return prev;
-      }
-
-      // 写入新值（转成数字，避免字符串拼接）
-      (target as any)[prop] = val === '' ? 0 : Number(val) || 0;
-
-      // 重新计算 capacity（工程师→Team→Project）
-      recalcCapacities(cloned);
-
-      return cloned;
-    });
+        (target as any)[prop] = val === '' ? 0 : Number(val) || 0;
+        recalcCapacities(cloned);
+        return cloned;
+      });
+    };
   };
 
-  // 周列配置：显示起始日期 + 周次，并保持 Excel 行为
+  const handleProjectEdit = useMemo(() => createEditHandler(setProjectRows), []);
+  const handleTeamEdit = useMemo(() => createEditHandler(setTeamRows), []);
+
+  // 公共周列配置
   const weekCols = useMemo(
     () =>
       weekLabels.map(([d, n], i) => ({
@@ -175,11 +245,8 @@ export default function App() {
 
           const num = Number(v);
           if (!isNaN(num) && num > 40) {
-            // 紫色边框
             style.border = '1px solid #FFFFFF';
-            // 紫色背景
             style.background = '#D200D2';
-            // 文字颜色建议白色
             style.color = '#ffffff';
           }
 
@@ -189,133 +256,263 @@ export default function App() {
     []
   );
 
-const baseCols = [
-  // {
-  //   prop: 'info',
-  //   name: 'Info',
-  //   size: 140,
-  //   cellTemplate: (h: any, p: any) => {
-  //     const level = (p.model as any)._level || 0;
-  //     const info = (p.model as any)._info || p.model.info || '';
-  //     const isRoot = level === 0;
-  //     const classes = ['cell-info', isRoot ? 'cell-info-root' : 'cell-info-child'];
-  //     return h(
-  //       'div',
-  //       {
-  //         class: classes.join(' '),
-  //         style: {
-  //           width: '100%',
-  //           height: '100%',
-  //           whiteSpace: 'pre-line',
-  //         },
-  //       },
-  //       isRoot ? info : ''
-  //     );
-  //   },
-  // },
+  // PlanProjects 的前置列
+  const projectBaseCols = [
+    {
+      prop: 'name',
+      name: 'Name',
+      size: 190,
+      cellTemplate: (h: any, p: any) => {
+        const level = (p.model as any)._level || 0;
+        const { bg, color } = getLevelStyle(level);
 
-  {
-    prop: 'name',
-    name: 'Name',
-    size: 190,
-    cellTemplate: (h: any, p: any) => {
-      const level = (p.model as any)._level || 0;
-      const { bg, color } = getLevelStyle(level);
+        let prefix = '';
+        if (level === 1) {
+          prefix = '·· ';
+        } else if (level >= 2) {
+          prefix = '···· ';
+        }
 
-      // 根据 level 生成前缀：0级不缩进，1级两个点，2级四个点
-      let prefix = '';
-      if (level === 1) {
-        prefix = '·· ';
-      } else if (level >= 2) {
-        prefix = '···· ';
-      }
+        const text = (p.model[p.prop] || '') as string;
 
-      const text = (p.model[p.prop] || '') as string;
-
-      return h(
-        'div',
-        {
-          class: 'cell-name',
-          style: {
-            background: bg,
-            color,
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
+        return h(
+          'div',
+          {
+            class: 'cell-name',
+            style: {
+              background: bg,
+              color,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+            },
           },
-        },
-        prefix + text
-      );
+          prefix + text
+        );
+      },
     },
-  },
+    {
+      prop: 'capacity',
+      name: 'Capacity',
+      size: 70,
+      cellTemplate: (h: any, p: any) => {
+        const level = (p.model as any)._level || 0;
+        const { bg, color } = getLevelStyle(level);
+        const v = p.model.capacity;
 
-
-  {
-    prop: 'capacity',
-    name: 'Capacity',
-    size: 70,
-    cellTemplate: (h: any, p: any) => {
-      const level = (p.model as any)._level || 0;
-      const { bg, color } = getLevelStyle(level);
-      const v = p.model.capacity;
-
-      return h(
-        'div',
-        {
-          class: 'cell-capacity',
-          style: {
-            textAlign: 'center',
-            background: bg,
-            color,
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+        return h(
+          'div',
+          {
+            class: 'cell-capacity',
+            style: {
+              textAlign: 'center',
+              background: bg,
+              color,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
           },
-        },
-        v == null || v === '' ? '' : String(v)
-      );
+          v == null || v === '' ? '' : String(v)
+        );
+      },
     },
-  },
+  ];
 
-];
+  // PlanTeams 的前置列：Name / Skill / Capacity
+  const teamBaseCols = [
+    {
+      prop: 'name',
+      name: 'Name',
+      size: 190,
+      cellTemplate: (h: any, p: any) => {
+        const level = (p.model as any)._level || 0;
+        const { bg, color } = getLevelStyle(level);
 
+        // 这里单独调整显示层级：
+        // XXX / ZZZ: level 0
+        // Capacity / Absences / Projects: 在 Name 列上显示为同一级
+        // SPA / FP0.8 / ZEEKR: 再往里一级
+        const rawName = (p.model[p.prop] || '') as string;
+        let displayLevel = level;
+        if ((rawName === 'Absences' || rawName === 'Projects') && level >= 2) {
+          displayLevel = 1;
+        }
+
+        let prefix = '';
+        if (displayLevel === 1) {
+          prefix = '·· ';
+        } else if (displayLevel >= 2) {
+          prefix = '···· ';
+        }
+
+        const text = rawName;
+
+        return h(
+          'div',
+          {
+            class: 'cell-name',
+            style: {
+              background: bg,
+              color,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+            },
+          },
+          prefix + text
+        );
+      },
+    },
+    {
+      prop: 'skill',
+      name: 'Skill',
+      size: 160,
+      cellTemplate: (h: any, p: any) => {
+        const level = (p.model as any)._level || 0;
+        const { bg } = getLevelStyle(level);
+        const text = (p.model[p.prop] || '') as string;
+        return h(
+          'div',
+          {
+            style: {
+              background: bg,
+              height: '100%',
+              width: '100%',
+              boxSizing: 'border-box',
+              border: '1px solid #dde4f5',
+              display: 'flex',
+              alignItems: 'center',
+            },
+          },
+          text
+        );
+      },
+    },
+    {
+      prop: 'capacity',
+      name: 'Capacity',
+      size: 70,
+      cellTemplate: (h: any, p: any) => {
+        const level = (p.model as any)._level || 0;
+        const { bg, color } = getLevelStyle(level);
+        const v = p.model.capacity;
+
+        return h(
+          'div',
+          {
+            class: 'cell-capacity',
+            style: {
+              textAlign: 'center',
+              background: bg,
+              color,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+          },
+          v == null || v === '' ? '' : String(v)
+        );
+      },
+    },
+  ];
 
   return (
-        <div className="app-container">
-      {/* 新增的顶部 Tab */}
+    <div className="app-container">
+      {/* 顶部 Tab：PlanProjects / PlanTeams / Review */}
       <div className="top-tabs">
-        <div className="tab-item active">Plan</div>
-        <div className="tab-item">Review</div>
+        <div
+          className={`tab-item ${activeTab === 'planProjects' ? 'active' : ''}`}
+          onClick={() => setActiveTab('planProjects')}
+        >
+          PlanProjects
+        </div>
+        <div
+          className={`tab-item ${activeTab === 'planTeams' ? 'active' : ''}`}
+          onClick={() => setActiveTab('planTeams')}
+        >
+          PlanTeams
+        </div>
+        <div
+          className={`tab-item ${activeTab === 'review' ? 'active' : ''}`}
+          onClick={() => setActiveTab('review')}
+        >
+          Review
+        </div>
       </div>
 
-      {/* 新增的下拉框行 */}
-      <div className="filter-row">
-        <select className="filter-select"><option>BU</option></select>
-        <select className="filter-select"><option>BudgetNumber</option></select>
-        <select className="filter-select"><option>BM</option></select>
-        <select className="filter-select"><option>Status</option></select>
-        <select className="filter-select"><option>Unit</option></select>
-        <select className="filter-select"><option>Group</option></select>
-      </div>
-    <div className="wrapper">
-      <YearBand spans={spans} colWidth={COL_W} />
-      <div className="grid-container">
-        <AnyRevoGrid
-          ref={gridRef}
-          source={flatRows}
-          columns={[...baseCols, ...weekCols]}
-          rowHeaders
-          range
-          clipboard
-          /* 直接绑定原生事件，类型不匹配忽略即可 */
-          // @ts-ignore
-          onAfterEdit={handleAfterEdit as any}
-          // @ts-ignore
-          onAfteredit={handleAfterEdit as any}
-        />
-      </div>
-    </div>
+      {/* === 1. PlanProjects：项目视角的工时规划 === */}
+      {activeTab === 'planProjects' && (
+        <>
+          {/* 下拉筛选行（原样保留） */}
+          <div className="filter-row">
+            <select className="filter-select"><option>BU</option></select>
+            <select className="filter-select"><option>BudgetNumber</option></select>
+            <select className="filter-select"><option>BM</option></select>
+            <select className="filter-select"><option>Status</option></select>
+            <select className="filter-select"><option>Unit</option></select>
+            <select className="filter-select"><option>Group</option></select>
+          </div>
+
+          <div className="wrapper">
+            <YearBand spans={spans} colWidth={COL_W} />
+            <div className="grid-container">
+              <RevoGrid
+                ref={projectGridRef}
+                source={flatProjectRows}
+                columns={[...projectBaseCols, ...weekCols]}
+                rowHeaders
+                range
+                clipboard
+                // @ts-ignore
+                onAfterEdit={handleProjectEdit as any}
+                // @ts-ignore
+                onAfteredit={handleProjectEdit as any}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* === 2. PlanTeams：人员视角的工时规划 === */}
+      {activeTab === 'planTeams' && (
+        <>
+          {/* 顶部筛选行，参考截图：Name / Responsibility / Unit / 筛选时间段 */}
+          <div className="filter-row">
+            <select className="filter-select"><option>Name</option></select>
+            <select className="filter-select"><option>Responsibility</option></select>
+            <select className="filter-select"><option>Unit</option></select>
+            <select className="filter-select"><option>筛选时间段</option></select>
+          </div>
+
+          <div className="wrapper">
+            <YearBand spans={spans} colWidth={COL_W} />
+            <div className="grid-container">
+              <RevoGrid
+                ref={teamGridRef}
+                source={flatTeamRows}
+                columns={[...teamBaseCols, ...weekCols]}
+                rowHeaders
+                range
+                clipboard
+                // @ts-ignore
+                onAfterEdit={handleTeamEdit as any}
+                // @ts-ignore
+                onAfteredit={handleTeamEdit as any}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* === 3. Review：先占位，后续实现报表视图 === */}
+      {activeTab === 'review' && (
+        <div className="wrapper">
+          
+        </div>
+      )}
     </div>
   );
 }
